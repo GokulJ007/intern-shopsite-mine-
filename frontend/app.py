@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import streamlit as st
 import requests
 import pandas as pd
@@ -230,106 +231,124 @@ def render_manage_products(key_prefix: str):
         st.error(f"❌ Error: {str(e)}")
 
 
-# =============== LOGIN PAGE ===============
-def login_page():
-    """Separate login/register page"""
+# =============== LOGIN VIEWS ===============
+def handle_login(username, password, expected_role):
+    if username and password:
+        try:
+            response = requests.post(
+                f"{API_URL}/users/login",
+                json={"username": username, "password": password}
+            )
+            if response.status_code == 200:
+                user_data = response.json()
+                if user_data:
+                    actual_role = user_data[0].get("role", "user")
+                    if actual_role != expected_role:
+                        st.error(f"❌ Unauthorized: This login section is for {expected_role.upper()} accounts only.")
+                        return
+                    st.session_state.user_id = user_data[0].get("id")
+                    st.session_state.username = user_data[0].get("name", "User")
+                    st.session_state.user_role = actual_role
+                    st.session_state.token = user_data[0].get("token")
+                    st.success(f"✅ Welcome, {st.session_state.username}!")
+                    st.balloons()
+                    st.rerun()
+            elif response.status_code == 401:
+                st.error("❌ Incorrect password. Please try again.")
+            elif response.status_code == 404:
+                st.error("❌ User not found. Please check your username.")
+            else:
+                st.error(f"❌ Login failed: {response.json().get('detail', 'Unknown error')}")
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+    else:
+        st.warning("⚠️ Please enter both Username and Password")
+
+def user_login():
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
         st.markdown("---")
         st.title("🛍️ Shopping Store")
-        st.markdown("Welcome! Please login or create an account to continue.")
+        st.markdown("### 🛒 User Portal")
+        st.markdown("Welcome! Please login to continue.")
         st.markdown("---")
         
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "🛒 User Login",
-            "📊 Manager Login",
-            "👨‍💼 Admin Login",
-            "📝 Register"
-        ])
+        user_username = st.text_input("Username", key="user_user", placeholder="e.g. John Doe")
+        user_password = st.text_input("Password", type="password", key="user_pass", placeholder="••••")
+        if st.button("Login as User", key="user_btn", type="primary", use_container_width=True):
+            handle_login(user_username, user_password, "user")
+            
+        st.markdown("---")
+        st.page_link(register_page, label="📝 Don't have an account? Register here", icon="📝")
+
+def manager_login():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("---")
+        st.title("🛍️ Shopping Store")
+        st.markdown("### 📊 Manager Portal")
+        st.markdown("Welcome! Please login to manage the store.")
+        st.markdown("---")
         
-        def handle_login(username, password, expected_role):
-            if username and password:
+        mgr_username = st.text_input("Username", key="mgr_user", placeholder="e.g. John Doe")
+        mgr_password = st.text_input("Password", type="password", key="mgr_pass", placeholder="••••")
+        if st.button("Login as Manager", key="mgr_btn", type="primary", use_container_width=True):
+            handle_login(mgr_username, mgr_password, "manager")
+            
+        st.markdown("---")
+        st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
+
+def admin_login():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("---")
+        st.title("🛍️ Shopping Store")
+        st.markdown("### 👨‍💼 Admin Portal")
+        st.markdown("Administrator authentication required.")
+        st.markdown("---")
+        
+        adm_username = st.text_input("Username", key="adm_user", placeholder="e.g. John Doe")
+        adm_password = st.text_input("Password", type="password", key="adm_pass", placeholder="••••")
+        if st.button("Login as Admin", key="adm_btn", type="primary", use_container_width=True):
+            handle_login(adm_username, adm_password, "admin")
+            
+        st.markdown("---")
+        st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
+
+def register_view():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("---")
+        st.title("🛍️ Shopping Store")
+        st.markdown("### 📝 Create New Account")
+        st.markdown("Register below to join the store.")
+        st.markdown("---")
+        
+        new_name = st.text_input("Full Name (Username)", key="reg_user", placeholder="John Doe")
+        new_email = st.text_input("Email Address", key="reg_email", placeholder="john@example.com")
+        new_password = st.text_input("Password", type="password", key="reg_pass", placeholder="Enter secure password")
+        
+        if st.button("Register", key="reg_btn", type="primary", use_container_width=True):
+            if new_name and new_email and new_password:
                 try:
                     response = requests.post(
-                        f"{API_URL}/users/login",
-                        json={"username": username, "password": password}
+                        f"{API_URL}/users",
+                        json={"name": new_name, "email": new_email, "password": new_password}
                     )
                     if response.status_code == 200:
-                        user_data = response.json()
-                        if user_data:
-                            actual_role = user_data[0].get("role", "user")
-                            if actual_role != expected_role:
-                                st.error(f"❌ Unauthorized: This login section is for {expected_role.upper()} accounts only.")
-                                return
-                            st.session_state.user_id = user_data[0].get("id")
-                            st.session_state.username = user_data[0].get("name", "User")
-                            st.session_state.user_role = actual_role
-                            st.session_state.token = user_data[0].get("token")
-                            st.success(f"✅ Welcome, {st.session_state.username}!")
-                            st.balloons()
-                            st.rerun()
-                    elif response.status_code == 401:
-                        st.error("❌ Incorrect password. Please try again.")
-                    elif response.status_code == 404:
-                        st.error("❌ User not found. Please check your username.")
+                        st.success("✅ Account created successfully!")
+                        st.balloons()
+                        st.info("📌 Redirecting you to the user login page...")
+                        st.switch_page(user_login_page)
                     else:
-                        st.error(f"❌ Login failed: {response.json().get('detail', 'Unknown error')}")
+                        st.error(f"❌ Error creating account: {response.json().get('detail', 'Unknown error')}")
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
             else:
-                st.warning("⚠️ Please enter both Username and Password")
-        
-        # USER LOGIN TAB
-        with tab1:
-            st.subheader("User Portal")
-            user_username = st.text_input("Username", key="user_user", placeholder="e.g. John Doe")
-            user_password = st.text_input("Password", type="password", key="user_pass", placeholder="••••")
-            if st.button("Login as User", key="user_btn", type="primary", use_container_width=True):
-                handle_login(user_username, user_password, "user")
+                st.warning("⚠️ Please fill in all fields (Name, Email, and Password)")
                 
-        # MANAGER LOGIN TAB
-        with tab2:
-            st.subheader("Manager Portal")
-            mgr_username = st.text_input("Username", key="mgr_user", placeholder="e.g. John Doe")
-            mgr_password = st.text_input("Password", type="password", key="mgr_pass", placeholder="••••")
-            if st.button("Login as Manager", key="mgr_btn", type="primary", use_container_width=True):
-                handle_login(mgr_username, mgr_password, "manager")
-                
-        # ADMIN LOGIN TAB
-        with tab3:
-            st.subheader("Admin Portal")
-            adm_username = st.text_input("Username", key="adm_user", placeholder="e.g. John Doe")
-            adm_password = st.text_input("Password", type="password", key="adm_pass", placeholder="••••")
-            if st.button("Login as Admin", key="adm_btn", type="primary", use_container_width=True):
-                handle_login(adm_username, adm_password, "admin")
-        
-        # REGISTER TAB
-        with tab4:
-            st.subheader("Create New Account")
-            new_name = st.text_input("Full Name (Username)", key="reg_user", placeholder="John Doe")
-            new_email = st.text_input("Email Address", key="reg_email", placeholder="john@example.com")
-            new_password = st.text_input("Password", type="password", key="reg_pass", placeholder="Enter secure password")
-            
-            if st.button("Register", key="reg_btn", type="primary", use_container_width=True):
-                if new_name and new_email and new_password:
-                    try:
-                        response = requests.post(
-                            f"{API_URL}/users",
-                            json={"name": new_name, "email": new_email, "password": new_password}
-                        )
-                        if response.status_code == 200:
-                            st.success("✅ Account created successfully!")
-                            st.info("📌 You can now sign in using your username and password in the appropriate section.")
-                            st.balloons()
-                        else:
-                            st.error(f"❌ Error creating account: {response.json().get('detail', 'Unknown error')}")
-                    except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
-                else:
-                    st.warning("⚠️ Please fill in all fields (Name, Email, and Password)")
-        
         st.markdown("---")
+        st.page_link(user_login_page, label="🛒 Already have an account? User Login", icon="🛒")
 
 
 # =============== HOME PAGE ===============
@@ -790,11 +809,20 @@ def home_page():
 
 
 # =============== MAIN APP LOGIC ===============
-# Check if user is logged in
+# Define page objects for routing
+user_login_page = st.Page(user_login, title="User Login", url_path="user", default=True)
+manager_login_page = st.Page(manager_login, title="Manager Login", url_path="manager")
+admin_login_page = st.Page(admin_login, title="Admin Login", url_path="admin")
+register_page = st.Page(register_view, title="Register", url_path="register")
+home_page_obj = st.Page(home_page, title="Home", url_path="home", default=True)
+
+# Run navigation
 if st.session_state.user_id is None:
-    login_page()
+    pg = st.navigation([user_login_page, manager_login_page, admin_login_page, register_page], position="hidden")
 else:
-    home_page()
+    pg = st.navigation([home_page_obj], position="hidden")
+
+pg.run()
 
 
 # =============== FLOATING CHAT WIDGET ===============
