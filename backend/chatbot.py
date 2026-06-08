@@ -24,12 +24,8 @@ class ChatResponse(BaseModel):
 
 # ─── Helper Functions ─────────────────────────────────────────────────────────
 def get_api_key() -> str:
-    key = os.getenv("GROQ_API_KEY")
-    if not key:
-        raise Exception(
-            "Missing GROQ_API_KEY in environment variables or .env file."
-        )
-    return key
+    # Deprecated: api key is handled dynamically in ask_ai
+    return ""
 
 
 def run_select_query(sql: str) -> str:
@@ -79,33 +75,58 @@ def build_reply_system_prompt(db_context: str) -> str:
 
 def ask_ai(input_messages: list) -> str:
     """
-    Calls the Groq API.
+    Calls the API (Groq or xAI) depending on which keys are configured.
     Accepts a list of message dicts.
-    Uses Few-Shot prompting and Role Separation for best accuracy.
     """
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    groq_key = os.getenv("GROQ_API_KEY")
+    xai_key = os.getenv("XAI_API_KEY")
 
-    response = requests.post(
-        url,
-        headers={
+    if groq_key:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {get_api_key()}"
-        },
-        json={
+            "Authorization": f"Bearer {groq_key}"
+        }
+        payload = {
             "model": "llama-3.3-70b-versatile",
             "messages": input_messages,
             "temperature": 0.1
-        },
-        timeout=30
-    )
+        }
+        provider = "Groq"
+    elif xai_key:
+        url = "https://api.x.ai/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {xai_key}"
+        }
+        payload = {
+            "model": "grok-4.3",
+            "messages": input_messages,
+            "temperature": 0.1
+        }
+        provider = "XAI"
+    else:
+        raise Exception("Missing both GROQ_API_KEY and XAI_API_KEY in environment variables or .env file.")
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+    print(f"{provider} Response Status: {response.status_code}")
+    try:
+        print(f"{provider} Response: {response.text[:1000]}")
+    except Exception:
+        pass
 
     data = response.json()
 
     if "error" in data:
-        raise Exception(data["error"].get("message", "Groq API error"))
+        error = data["error"]
+        if isinstance(error, dict):
+            raise Exception(error.get("message", f"{provider} API error"))
+        else:
+            raise Exception(f"{provider} API error: {error}")
 
     if not data.get("choices"):
-        raise Exception("No response from Groq")
+        raise Exception(f"No response from {provider}")
 
     return data["choices"][0]["message"]["content"].strip()
 
@@ -130,7 +151,7 @@ def chat(body: ChatRequest):
                     "Your task is to analyze user queries and output ONLY a valid MySQL SELECT statement, "
                     "OR the exact word 'NODB' if no database lookup is needed.\n\n"
                     "Database Schema:\n"
-                    "1. products (id INT, name VARCHAR, price DECIMAL, stock INT, image_url VARCHAR)\n"
+                    "1. products (id INT, name VARCHAR, price DECIMAL, stock INT, image_url VARCHAR, category VARCHAR)\n"
                     "2. orders (id INT, user_id INT, created_at DATETIME)\n"
                     "3. order_items (id INT, order_id INT, product_id INT, quantity INT)\n"
                     "4. users (id INT, name VARCHAR, email VARCHAR, role VARCHAR)\n\n"

@@ -1,4 +1,23 @@
 import pymysql
+import re
+
+def get_category_by_name(name: str) -> str:
+    name_lower = name.lower()
+    electronics_kws = ["headphone", "earbud", "speaker", "mouse", "keyboard", "charging", "charger", "plug", "hub", "webcam", "rtx", "monitor", "led", "lamp", "arm", "stand", "warmer", "pouch", "band", "device", "computer", "laptop"]
+    fashion_kws = ["wallet", "backpack", "bag", "sunglasses", "watch", "umbrella", "pack", "belt", "shoes", "shirt", "pants", "tote", "passport"]
+    beauty_kws = ["diffuser", "soap", "towel", "massage", "skincare", "hair", "brush", "beauty", "aromatherapy"]
+    
+    for kw in electronics_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Electronics"
+    for kw in fashion_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Fashion"
+    for kw in beauty_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Beauty and Personal Care"
+            
+    return "Home and Kitchen"
 
 def migrate():
     try:
@@ -25,6 +44,22 @@ def migrate():
             else:
                 print("'image_url' column already exists in 'products' table.")
             
+            if 'category' not in column_names:
+                print("Adding 'category' column to 'products' table...")
+                cursor.execute("ALTER TABLE products ADD COLUMN category VARCHAR(100) DEFAULT NULL")
+                print("Column added successfully!")
+            else:
+                print("'category' column already exists in 'products' table.")
+            
+            # Auto-classify all existing products
+            cursor.execute("SELECT id, name FROM products")
+            products = cursor.fetchall()
+            for prod in products:
+                prod_id, name = prod[0], prod[1]
+                category = get_category_by_name(name)
+                print(f"Classifying '{name}' as '{category}'...")
+                cursor.execute("UPDATE products SET category = %s WHERE id = %s", (category, prod_id))
+            
             # Seed curated high-quality stock photo URLs for existing products
             seeds = {
                 "Wireless Mouse": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=600&auto=format&fit=crop&q=80",
@@ -50,6 +85,6 @@ def migrate():
     finally:
         if 'connection' in locals() and connection:
             connection.close()
-
+ 
 if __name__ == "__main__":
     migrate()

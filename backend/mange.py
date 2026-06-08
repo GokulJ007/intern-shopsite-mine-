@@ -110,8 +110,8 @@ def create_product(product: Product, current_user: dict = Depends(get_current_us
             if not user_result or user_result.get('role') not in ['manager', 'admin']:
                 raise HTTPException(status_code=403, detail="Manager or Admin access required")
             
-            sql = "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)"
-            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url))
+            sql = "INSERT INTO products (name, price, stock, image_url, category) VALUES (%s, %s, %s, %s, %s)"
+            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url, product.category))
             connection.commit()
             product_id = cursor.lastrowid
             return {"message": "Product created successfully", "product_id": product_id}
@@ -144,8 +144,8 @@ def update_product(product_id: int = Path(...), product: Product = ..., current_
             if not cursor.fetchone():
                 raise HTTPException(status_code=404, detail="Product not found")
             
-            sql = "UPDATE products SET name = %s, price = %s, stock = %s, image_url = %s WHERE id = %s"
-            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url, product_id))
+            sql = "UPDATE products SET name = %s, price = %s, stock = %s, image_url = %s, category = %s WHERE id = %s"
+            cursor.execute(sql, (product.name, product.price, product.stock, product.image_url, product.category, product_id))
             connection.commit()
             return {"message": "Product updated successfully", "product_id": product_id}
     except HTTPException as he:

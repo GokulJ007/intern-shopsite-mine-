@@ -11,6 +11,7 @@ class Product(BaseModel):
     price: float
     stock: int
     image_url: Optional[str] = None
+    category: Optional[str] = None
 
 class ItemData(BaseModel):
     id: int

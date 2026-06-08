@@ -34,12 +34,19 @@ def render_add_product(key_prefix: str):
     with col2:
         product_price = st.number_input("Price ($)", min_value=0.0, step=0.01, key=f"{key_prefix}_add_price")
     
-    col3, col4 = st.columns(2)
+    col3, col4, col5 = st.columns(3)
     
     with col3:
         product_stock = st.number_input("Stock Quantity", min_value=0, step=1, key=f"{key_prefix}_add_stock")
     
     with col4:
+        product_category = st.selectbox(
+            "Product Category",
+            ["Electronics", "Fashion", "Home and Kitchen", "Beauty and Personal Care"],
+            key=f"{key_prefix}_add_category"
+        )
+    
+    with col5:
         image_source = st.selectbox(
             "Product Image Option", 
             ["Auto-suggest beautiful stock image based on name", "Provide Image URL", "Upload Image from computer", "None"],
@@ -82,7 +89,8 @@ def render_add_product(key_prefix: str):
                     "name": product_name, 
                     "price": product_price, 
                     "stock": product_stock,
-                    "image_url": final_image_url
+                    "image_url": final_image_url,
+                    "category": product_category
                 }
                 headers = {}
                 if st.session_state.token:
@@ -122,7 +130,7 @@ def render_manage_products(key_prefix: str):
                         if product.get('image_url'):
                             st.image(product.get('image_url'), width=150)
                         
-                        col1, col2, col3 = st.columns([2, 2, 2])
+                        col1, col2, col3, col4 = st.columns(4)
                         
                         with col1:
                             new_price = st.number_input(
@@ -143,7 +151,18 @@ def render_manage_products(key_prefix: str):
                             )
                             
                         with col3:
-                            # Image source option
+                            current_category = product.get('category') or "Electronics"
+                            categories_list = ["Electronics", "Fashion", "Home and Kitchen", "Beauty and Personal Care"]
+                            if current_category not in categories_list:
+                                categories_list.append(current_category)
+                            new_category = st.selectbox(
+                                "Category",
+                                categories_list,
+                                index=categories_list.index(current_category),
+                                key=f"{key_prefix}_category_{product['id']}"
+                            )
+                            
+                        with col4:
                             image_update_source = st.selectbox(
                                 "Update Image Option",
                                 ["Keep Current Image", "Provide Image URL", "Upload Image from computer", "None/Remove Image"],
@@ -169,16 +188,16 @@ def render_manage_products(key_prefix: str):
                             )
                             if uploaded_file_edit is not None:
                                 with st.spinner("Uploading new image..."):
-                                    try:
-                                        files = {"file": (uploaded_file_edit.name, uploaded_file_edit.getvalue(), uploaded_file_edit.type)}
-                                        upload_res = requests.post(f"{API_URL}/products/upload-image", files=files)
-                                        if upload_res.status_code == 200:
-                                            updated_image_url = upload_res.json().get("image_url")
-                                            st.success("✅ Image uploaded successfully!")
-                                        else:
-                                            st.error("❌ Failed to upload image.")
-                                    except Exception as e:
-                                        st.error(f"❌ Upload error: {str(e)}")
+                                     try:
+                                         files = {"file": (uploaded_file_edit.name, uploaded_file_edit.getvalue(), uploaded_file_edit.type)}
+                                         upload_res = requests.post(f"{API_URL}/products/upload-image", files=files)
+                                         if upload_res.status_code == 200:
+                                             updated_image_url = upload_res.json().get("image_url")
+                                             st.success("✅ Image uploaded successfully!")
+                                         else:
+                                             st.error("❌ Failed to upload image.")
+                                     except Exception as e:
+                                         st.error(f"❌ Upload error: {str(e)}")
                         
                         col_update, col_delete = st.columns(2)
                         
@@ -194,7 +213,8 @@ def render_manage_products(key_prefix: str):
                                             "name": product['name'], 
                                             "price": new_price, 
                                             "stock": new_stock,
-                                            "image_url": updated_image_url
+                                            "image_url": updated_image_url,
+                                            "category": new_category
                                         },
                                         headers=headers
                                     )
@@ -387,20 +407,31 @@ def home_page():
     with tab_shop:
         st.subheader("Available Products")
         
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
         with col1:
             search_name = st.text_input("🔍 Search products")
         with col2:
-            refresh = st.button("🔄 Refresh")
+            category_filter = st.selectbox(
+                "📂 Category",
+                ["All", "Electronics", "Fashion", "Home and Kitchen", "Beauty and Personal Care"]
+            )
+        with col3:
+            price_range = st.slider("💰 Price Range ($)", 0.0, 500.0, (0.0, 500.0), step=5.0)
+        with col4:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            refresh = st.button("🔄 Refresh", use_container_width=True)
         
         try:
-            response = requests.get(f"{API_URL}/products")
+            response = requests.get(f"{API_URL}/products", params={"category": category_filter})
             if response.status_code == 200:
                 products = response.json()
                 
                 # Filter by search
                 if search_name:
                     products = [p for p in products if search_name.lower() in p["name"].lower()]
+                
+                # Filter by price range
+                products = [p for p in products if price_range[0] <= p["price"] <= price_range[1]]
                 
                 if products:
                     # Display products in a grid

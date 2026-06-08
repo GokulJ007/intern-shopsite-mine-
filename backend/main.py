@@ -155,12 +155,16 @@ def login(credentials: LoginRequest):
 
 
 @app.get("/products")
-def get_products():
+def get_products(category: Optional[str] = None):
     try:
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql = "SELECT id, name, price, stock, image_url FROM products"
-            cursor.execute(sql)
+            if category and category != "All":
+                sql = "SELECT id, name, price, stock, image_url, category FROM products WHERE category = %s"
+                cursor.execute(sql, (category,))
+            else:
+                sql = "SELECT id, name, price, stock, image_url, category FROM products"
+                cursor.execute(sql)
             result = cursor.fetchall()
             return result
     except Exception as e:

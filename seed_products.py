@@ -305,6 +305,26 @@ products_seed = [
     }
 ]
 
+import re
+
+def get_category_by_name(name: str) -> str:
+    name_lower = name.lower()
+    electronics_kws = ["headphone", "earbud", "speaker", "mouse", "keyboard", "charging", "charger", "plug", "hub", "webcam", "rtx", "monitor", "led", "lamp", "arm", "stand", "warmer", "pouch", "band", "device", "computer", "laptop"]
+    fashion_kws = ["wallet", "backpack", "bag", "sunglasses", "watch", "umbrella", "pack", "belt", "shoes", "shirt", "pants", "tote", "passport"]
+    beauty_kws = ["diffuser", "soap", "towel", "massage", "skincare", "hair", "brush", "beauty", "aromatherapy"]
+    
+    for kw in electronics_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Electronics"
+    for kw in fashion_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Fashion"
+    for kw in beauty_kws:
+        if re.search(r'\b' + kw + r's?\b', name_lower):
+            return "Beauty and Personal Care"
+            
+    return "Home and Kitchen"
+
 def seed_db():
     try:
         connection = pymysql.connect(
@@ -325,20 +345,21 @@ def seed_db():
             existing_names = {row[0] for row in cursor.fetchall()}
             
             for p in products_seed:
+                category = get_category_by_name(p["name"])
                 if p["name"] in existing_names:
-                    # Update details (price, stock, image_url) for existing products to make them look premium
-                    print(f"Product '{p['name']}' already exists. Updating price, stock, and image...")
+                    # Update details (price, stock, image_url, category) for existing products to make them look premium
+                    print(f"Product '{p['name']}' already exists. Updating price, stock, image, and category...")
                     cursor.execute(
-                        "UPDATE products SET price = %s, stock = %s, image_url = %s WHERE name = %s",
-                        (p["price"], p["stock"], p["image_url"], p["name"])
+                        "UPDATE products SET price = %s, stock = %s, image_url = %s, category = %s WHERE name = %s",
+                        (p["price"], p["stock"], p["image_url"], category, p["name"])
                     )
                     updated_count += 1
                 else:
                     # Insert new product
                     print(f"Inserting product '{p['name']}'...")
                     cursor.execute(
-                        "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                        (p["name"], p["price"], p["stock"], p["image_url"])
+                        "INSERT INTO products (name, price, stock, image_url, category) VALUES (%s, %s, %s, %s, %s)",
+                        (p["name"], p["price"], p["stock"], p["image_url"], category)
                     )
                     inserted_count += 1
             
@@ -350,6 +371,6 @@ def seed_db():
     finally:
         if 'connection' in locals() and connection:
             connection.close()
-
+ 
 if __name__ == "__main__":
     seed_db()
