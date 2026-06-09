@@ -12,11 +12,11 @@ from dotenv import load_dotenv
 # Load env variables (such as GROQ_API_KEY) from .env file
 load_dotenv()
 
-from database import DB_connection
-from auth import hash_password, verify_password, create_access_token
-import rbac
-import mange
-import chatbot
+from backend.database import DB_connection
+from backend.auth import hash_password, verify_password, create_access_token
+import backend.rbac as rbac
+import backend.mange as mange
+import backend.chatbot as chatbot   
 
 app = FastAPI()
 app.add_middleware(
