@@ -5,7 +5,7 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from database import DB_connection
+from backend.database import DB_connection
 
 router = APIRouter()
 

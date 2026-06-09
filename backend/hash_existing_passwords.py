@@ -1,7 +1,7 @@
 import pymysql
 import pymysql.cursors
-from database import DB_connection
-from auth import hash_password
+from backend.database import DB_connection
+from backend.auth import hash_password
 
 def migrate_passwords():
     try:

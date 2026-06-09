@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Path, Header, Depends
 from typing import List, Optional
-from schema import Product, RoleUpdate
-from rbac import RoleChecker, get_current_user
-from database import DB_connection
+from backend.schema import Product, RoleUpdate
+from backend.rbac import RoleChecker, get_current_user
+from backend.database import DB_connection
 
 router = APIRouter()
 

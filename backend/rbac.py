@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional
-from database import DB_connection
-from auth import decode_access_token
+from backend.database import DB_connection
+from backend.auth import decode_access_token
 
 router = APIRouter()
 security = HTTPBearer()
