@@ -8,7 +8,7 @@ from datetime import datetime
 st.set_page_config(page_title="Shopping Store", layout="wide")
 
 # Backend API URL
-API_URL = "http://localhost:8000"
+API_URL = "https://shopsite-streamlit.onrender.com"
 
 # Initialize session state
 if "cart" not in st.session_state:
