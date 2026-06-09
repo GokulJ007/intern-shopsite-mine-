@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Path, Query, Depends, Header, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from schema import User, Product, Order, OrderItem, ItemData, RoleUpdate, LoginRequest
+from backend.schema import User, Product, Order, OrderItem, ItemData, RoleUpdate, LoginRequest
 from typing import List, Optional
 import pymysql
 import pymysql.cursors
