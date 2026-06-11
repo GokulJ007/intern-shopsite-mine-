@@ -13,4 +13,4 @@ def DB_connection():
         )
         return connector
     except pymysql.MySQLError as e:
-        raise Exception("error in connecting to db") from e
+        raise Exception(f"error in connecting to db: {str(e)}") from e

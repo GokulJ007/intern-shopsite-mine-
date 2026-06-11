@@ -48,4 +48,5 @@ def user_get_own_data(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()

@@ -51,7 +51,8 @@ def get_users():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.get("/users/{user_id}")
@@ -74,7 +75,9 @@ def get_user(user_id: int = Path(...)):
                 p.name AS product_name,
                 p.price, oi.quantity,
                 o.id AS order_id,
-                oi.product_id
+                oi.product_id,
+                o.delivery_status,
+                o.delivery_person_id
             FROM users u
             LEFT JOIN orders o       ON u.id          = o.user_id
             LEFT JOIN order_items oi ON o.id          = oi.order_id
@@ -92,7 +95,8 @@ def get_user(user_id: int = Path(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.post("/users")
@@ -109,7 +113,8 @@ def create_user(user: User):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.post("/users/login")
@@ -151,7 +156,8 @@ def login(credentials: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.get("/products")
@@ -170,7 +176,8 @@ def get_products(category: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.post("/products/upload-image")
@@ -203,10 +210,23 @@ def upload_image(file: UploadFile = File(...)):
 @app.post("/orders")
 def create_order(payload: Order):
     try:
+        import random
         connection = DB_connection()
         with connection.cursor() as cursor:
-            sql_order = "INSERT INTO orders (user_id) VALUES (%s)"
-            cursor.execute(sql_order, (payload.user_id,))
+            # Query active delivery personnel
+            cursor.execute("SELECT id FROM users WHERE role = 'delivery_person'")
+            delivery_personnel = cursor.fetchall()
+            
+            if delivery_personnel:
+                selected_person = random.choice(delivery_personnel)
+                delivery_person_id = selected_person['id']
+                delivery_status = 'Confirmed'
+            else:
+                delivery_person_id = None
+                delivery_status = 'Pending'
+                
+            sql_order = "INSERT INTO orders (user_id, delivery_status, delivery_person_id) VALUES (%s, %s, %s)"
+            cursor.execute(sql_order, (payload.user_id, delivery_status, delivery_person_id))
             order_id = cursor.lastrowid
             
             sql_item = "INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, %s)"
@@ -218,7 +238,8 @@ def create_order(payload: Order):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.delete("/orders/{order_id}")
@@ -237,7 +258,8 @@ def delete_order(order_id: int = Path(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.put("/orders/{order_id}")
@@ -260,7 +282,8 @@ def update_order(order_id: int, payload: Order):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @app.get("/items", response_model=List[ItemData])
@@ -276,4 +299,93 @@ def get_items():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
+
+
+from pydantic import BaseModel
+
+class DeliveryStatusUpdate(BaseModel):
+    status: str
+
+@app.get("/delivery/orders")
+def get_delivery_orders(current_user: dict = Depends(rbac.get_current_user)):
+    """Fetch orders assigned to the logged-in delivery person"""
+    if current_user.get('role') != 'delivery_person':
+        raise HTTPException(status_code=403, detail="Delivery Person access required")
+        
+    delivery_person_id = current_user.get('id')
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            sql = """
+                SELECT 
+                    o.id AS order_id,
+                    o.created_at,
+                    o.delivery_status,
+                    u.name AS customer_name,
+                    u.email AS customer_email,
+                    p.name AS product_name,
+                    oi.quantity,
+                    p.price
+                FROM orders o
+                JOIN users u ON o.user_id = u.id
+                LEFT JOIN order_items oi ON o.id = oi.order_id
+                LEFT JOIN products p ON oi.product_id = p.id
+                WHERE o.delivery_person_id = %s
+                ORDER BY o.created_at DESC
+            """
+            cursor.execute(sql, (delivery_person_id,))
+            result = cursor.fetchall()
+            return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'connection' in locals() and connection:
+            connection.close()
+
+@app.put("/delivery/orders/{order_id}/status")
+def update_delivery_status(
+    order_id: int, 
+    payload: DeliveryStatusUpdate, 
+    current_user: dict = Depends(rbac.get_current_user)
+):
+    """Update delivery status of an assigned order: Confirmed -> Out for Delivery -> Delivered"""
+    if current_user.get('role') != 'delivery_person':
+        raise HTTPException(status_code=403, detail="Delivery Person access required")
+        
+    delivery_person_id = current_user.get('id')
+    new_status = payload.status
+    
+    if new_status not in ["Out for Delivery", "Delivered"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Delivery person can only set 'Out for Delivery' or 'Delivered'")
+        
+    try:
+        connection = DB_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT delivery_status, delivery_person_id FROM orders WHERE id = %s", (order_id,))
+            order = cursor.fetchone()
+            
+            if not order:
+                raise HTTPException(status_code=404, detail="Order not found")
+                
+            if order.get('delivery_person_id') != delivery_person_id:
+                raise HTTPException(status_code=403, detail="You can only update orders assigned to you")
+                
+            current_status = order.get('delivery_status')
+            
+            if new_status == "Out for Delivery" and current_status != "Confirmed":
+                raise HTTPException(status_code=400, detail="Can only change status to 'Out for Delivery' from 'Confirmed'")
+            if new_status == "Delivered" and current_status != "Out for Delivery":
+                raise HTTPException(status_code=400, detail="Can only change status to 'Delivered' from 'Out for Delivery'")
+                
+            cursor.execute("UPDATE orders SET delivery_status = %s WHERE id = %s", (new_status, order_id))
+            connection.commit()
+            return {"message": f"Order status updated to '{new_status}' successfully"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'connection' in locals() and connection:
+            connection.close()

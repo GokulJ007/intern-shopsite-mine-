@@ -3,6 +3,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
+import os
 
 # Configure page
 st.set_page_config(page_title="Shopping Store", layout="wide")
@@ -300,6 +301,7 @@ def user_login():
             
         st.markdown("---")
         st.page_link(register_page, label="📝 Don't have an account? Register here", icon="📝")
+        st.page_link(delivery_login_page, label="🚚 Delivery Personnel Portal", icon="🚚")
 
 def manager_login():
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -331,6 +333,23 @@ def admin_login():
         adm_password = st.text_input("Password", type="password", key="adm_pass", placeholder="••••")
         if st.button("Login as Admin", key="adm_btn", type="primary", use_container_width=True):
             handle_login(adm_username, adm_password, "admin")
+            
+        st.markdown("---")
+        st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
+
+def delivery_login():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("---")
+        st.title("🛍️ Shopping Store")
+        st.markdown("### 🚚 Delivery Portal")
+        st.markdown("Welcome! Please login to manage deliveries.")
+        st.markdown("---")
+        
+        deliv_username = st.text_input("Username", key="deliv_user", placeholder="e.g. John Doe")
+        deliv_password = st.text_input("Password", type="password", key="deliv_pass", placeholder="••••")
+        if st.button("Login as Delivery Person", key="deliv_btn", type="primary", use_container_width=True):
+            handle_login(deliv_username, deliv_password, "delivery_person")
             
         st.markdown("---")
         st.page_link(user_login_page, label="🛒 Go back to User Login", icon="🛒")
@@ -395,18 +414,127 @@ def home_page():
     # User info bar
     st.info(f"👤 Welcome, **{st.session_state.username}** | Role: **{st.session_state.user_role}** | ID: {st.session_state.user_id}")
     
+    if st.session_state.user_role == "delivery_person":
+        st.subheader("🚚 Your Assigned Deliveries")
+        
+        if st.button("🔄 Refresh Deliveries", key="deliv_refresh", use_container_width=True):
+            st.rerun()
+            
+        try:
+            headers = {}
+            if st.session_state.token:
+                headers["Authorization"] = f"Bearer {st.session_state.token}"
+            
+            response = requests.get(f"{API_URL}/delivery/orders", headers=headers)
+            if response.status_code == 200:
+                orders = response.json()
+                
+                if orders:
+                    # Group by order_id
+                    orders_dict = {}
+                    for item in orders:
+                        order_id = item['order_id']
+                        if order_id not in orders_dict:
+                            orders_dict[order_id] = []
+                        orders_dict[order_id].append(item)
+                        
+                    for order_id, items in orders_dict.items():
+                        first_item = items[0]
+                        status = first_item['delivery_status']
+                        customer_name = first_item['customer_name']
+                        customer_email = first_item['customer_email']
+                        created_at = first_item['created_at']
+                        
+                        with st.container(border=True):
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.markdown(f"### Order #{order_id}")
+                                st.caption(f"👤 Customer: **{customer_name}** ({customer_email}) | 📅 Placed at: {created_at}")
+                            with col2:
+                                status_emojis = {
+                                    "Pending": "🟡 Pending",
+                                    "Confirmed": "🔵 Confirmed",
+                                    "Out for Delivery": "🚚 Out for Delivery",
+                                    "Delivered": "🟢 Delivered"
+                                }
+                                display_status = status_emojis.get(status, f"❓ {status}")
+                                st.info(f"**Status:** {display_status}")
+                            
+                            # Show products
+                            order_items_list = []
+                            for item in items:
+                                order_items_list.append({
+                                    "Product": item['product_name'],
+                                    "Quantity": item['quantity'],
+                                    "Price": f"${item['price']:.2f}"
+                                })
+                            df_items = pd.DataFrame(order_items_list)
+                            st.dataframe(df_items, width='stretch', hide_index=True)
+                            
+                            # Action buttons
+                            if status == 'Confirmed':
+                                if st.button("🚚 Mark Out for Delivery", key=f"out_deliv_{order_id}", use_container_width=True, type="primary"):
+                                    try:
+                                        update_res = requests.put(
+                                            f"{API_URL}/delivery/orders/{order_id}/status",
+                                            json={"status": "Out for Delivery"},
+                                            headers=headers
+                                        )
+                                        if update_res.status_code == 200:
+                                            st.success("✅ Order is now Out for Delivery!")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ Error: {update_res.json().get('detail', 'Failed to update')}")
+                                    except Exception as e:
+                                        st.error(f"❌ Error: {str(e)}")
+                                        
+                            elif status == 'Out for Delivery':
+                                if st.button("✅ Mark Delivered", key=f"delivered_{order_id}", use_container_width=True, type="primary"):
+                                    try:
+                                        update_res = requests.put(
+                                            f"{API_URL}/delivery/orders/{order_id}/status",
+                                            json={"status": "Delivered"},
+                                            headers=headers
+                                        )
+                                        if update_res.status_code == 200:
+                                            st.success("🎉 Order delivered successfully!")
+                                            st.rerun()
+                                        else:
+                                            st.error(f"❌ Error: {update_res.json().get('detail', 'Failed to update')}")
+                                    except Exception as e:
+                                        st.error(f"❌ Error: {str(e)}")
+                                        
+                            elif status == 'Delivered':
+                                st.success("🎉 Delivery Completed!")
+                else:
+                    st.info("💭 No orders assigned to you yet.")
+            else:
+                st.error(f"❌ Failed to fetch assigned orders: {response.status_code} - {response.text}")
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+            
+        return
+
+    # Calculate cart count
+    cart_count = sum(item['quantity'] for item in st.session_state.cart)
+    cart_label = f"💳 Cart ({cart_count})" if cart_count > 0 else "💳 Cart"
+    
     # Main tabs - vary based on role
     if st.session_state.user_role == "admin":
-        tab_shop, tab_cart, tab_orders, tab_admin = st.tabs(["🛒 Shop", "💳 Cart", "📦 Orders", "👨‍💼 Admin Panel"])
+        tab_shop, tab_cart, tab_orders, tab_admin = st.tabs(["🛒 Shop", cart_label, "📦 Orders", "👨‍💼 Admin Panel"])
     elif st.session_state.user_role == "manager":
-        tab_shop, tab_cart, tab_orders, tab_manager = st.tabs(["🛒 Shop", "💳 Cart", "📦 Orders", "📊 Manager Panel"])
+        tab_shop, tab_cart, tab_orders, tab_manager = st.tabs(["🛒 Shop", cart_label, "📦 Orders", "📊 Manager Panel"])
     else:
-        tab_shop, tab_cart, tab_orders = st.tabs(["🛒 Shop", "💳 Cart", "📦 Orders"])
+        tab_shop, tab_cart, tab_orders = st.tabs(["🛒 Shop", cart_label, "📦 Orders"])
     
     # SHOP TAB
     with tab_shop:
         st.subheader("Available Products")
         
+        if "cart_msg" in st.session_state and st.session_state.cart_msg:
+            st.success(st.session_state.cart_msg)
+            del st.session_state.cart_msg
+    
         col1, col2, col3, col4 = st.columns([3, 3, 3, 1])
         with col1:
             search_name = st.text_input("🔍 Search products")
@@ -483,7 +611,8 @@ def home_page():
                                             'quantity': qty
                                         })
                                     
-                                    st.success(f"✅ Added {qty} to cart!")
+                                    st.session_state.cart_msg = f"✅ Added {qty} to cart!"
+                                    st.rerun()
                 else:
                     st.info("No products found")
             else:
@@ -494,6 +623,10 @@ def home_page():
     # CART TAB
     with tab_cart:
         st.subheader("Shopping Cart")
+        
+        if "cart_msg" in st.session_state and st.session_state.cart_msg:
+            st.success(st.session_state.cart_msg)
+            del st.session_state.cart_msg
         
         if st.session_state.cart:
             total_price = 0
@@ -539,7 +672,7 @@ def home_page():
             
             if to_remove is not None:
                 removed_item = st.session_state.cart.pop(to_remove)
-                st.success(f"Removed {removed_item['name']} from cart!")
+                st.session_state.cart_msg = f"✅ Removed {removed_item['name']} from cart!"
                 st.rerun()
             
             st.divider()
@@ -551,6 +684,7 @@ def home_page():
             with col2:
                 if st.button("Clear Cart", width='stretch'):
                     st.session_state.cart = []
+                    st.session_state.cart_msg = "🧹 Cart cleared!"
                     st.rerun()
             
             st.divider()
@@ -569,7 +703,7 @@ def home_page():
                     response = requests.post(f"{API_URL}/orders", json=order_payload)
                     
                     if response.status_code == 200:
-                        st.success("✅ Order placed successfully!")
+                        st.session_state.cart_msg = "✅ Order placed successfully!"
                         st.session_state.cart = []
                         st.rerun()
                     else:
@@ -617,7 +751,8 @@ def home_page():
                                     "Product": item['product_name'],
                                     "Price": f"${item['price']:.2f}",
                                     "Quantity": item['quantity'],
-                                    "Total": f"${item_total:.2f}"
+                                    "Total": f"${item_total:.2f}",
+                                    "Delivery Status": item.get('delivery_status') or 'Pending'
                                 })
                             
                             df = pd.DataFrame(order_data)
@@ -673,7 +808,7 @@ def home_page():
                                 user_id_to_change = st.number_input("Select User ID", min_value=1, step=1)
                             
                             with col2:
-                                new_role = st.selectbox("New Role", ["user", "manager", "admin"])
+                                new_role = st.selectbox("New Role", ["user", "manager", "admin", "delivery_person"])
                             
                             with col3:
                                 if st.button("Update Role", width='stretch', type="primary"):
@@ -760,6 +895,7 @@ def home_page():
                                                     "Product": order.get('product_name'),
                                                     "Price": f"${order.get('price', 0):.2f}",
                                                     "Quantity": order.get('quantity'),
+                                                    "Delivery Status": order.get('delivery_status') or 'Pending',
                                                 })
                                 except:
                                     pass
@@ -844,12 +980,13 @@ def home_page():
 user_login_page = st.Page(user_login, title="User Login", url_path="user", default=True)
 manager_login_page = st.Page(manager_login, title="Manager Login", url_path="manager")
 admin_login_page = st.Page(admin_login, title="Admin Login", url_path="admin")
+delivery_login_page = st.Page(delivery_login, title="Delivery Login", url_path="delivery")
 register_page = st.Page(register_view, title="Register", url_path="register")
 home_page_obj = st.Page(home_page, title="Home", url_path="home", default=True)
 
 # Run navigation
 if st.session_state.user_id is None:
-    pg = st.navigation([user_login_page, manager_login_page, admin_login_page, register_page], position="hidden")
+    pg = st.navigation([user_login_page, manager_login_page, admin_login_page, delivery_login_page, register_page], position="hidden")
 else:
     pg = st.navigation([home_page_obj], position="hidden")
 

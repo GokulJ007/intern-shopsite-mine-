@@ -22,7 +22,7 @@ def update_user_role(user_id: int = Path(...), role_update: RoleUpdate = ..., cu
                 raise HTTPException(status_code=403, detail="Admin access required")
             
             # Validate role
-            valid_roles = ["user", "manager", "admin"]
+            valid_roles = ["user", "manager", "admin", "delivery_person"]
             if role_update.role not in valid_roles:
                 raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}")
             
@@ -42,7 +42,8 @@ def update_user_role(user_id: int = Path(...), role_update: RoleUpdate = ..., cu
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.delete("/users/{user_id}")
@@ -92,7 +93,8 @@ def delete_user(user_id: int = Path(...), current_user: dict = Depends(get_curre
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.post("/products")
@@ -120,7 +122,8 @@ def create_product(product: Product, current_user: dict = Depends(get_current_us
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.put("/products/{product_id}")
@@ -153,7 +156,8 @@ def update_product(product_id: int = Path(...), product: Product = ..., current_
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.delete("/products/{product_id}")
@@ -186,7 +190,8 @@ def delete_product(product_id: int = Path(...), current_user: dict = Depends(get
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.get("/admin/all-users")
@@ -204,7 +209,8 @@ def admin_get_all_users(role: str = Depends(RoleChecker(["admin"]))):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 @router.get("/manager/users")
@@ -231,4 +237,5 @@ def manager_get_users(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        connection.close()
+        if 'connection' in locals() and connection:
+            connection.close()
