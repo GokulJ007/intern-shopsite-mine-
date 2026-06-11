@@ -9,7 +9,7 @@ import os
 st.set_page_config(page_title="Shopping Store", layout="wide")
 
 # Backend API URL
-API_URL = "http://localhost:8000"
+API_URL = "https://shopsite-streamlit.onrender.com"
 
 # Initialize session state
 if "cart" not in st.session_state:
@@ -715,9 +715,9 @@ def home_page():
     
     # ORDERS TAB
     with tab_orders:
-        st.subheader("Your Orders")
+        st.subheader("Your Order")
         
-        if st.button("🔄 Refresh Orders"):
+        if st.button("🔄 Refresh Order"):
             st.rerun()
         
         try:
