@@ -1,100 +1,9 @@
 # 🛍️ Shopping Store (FakeDB E-Commerce)
-
-A full-stack, role-based e-commerce platform built using **FastAPI** for the backend, **Streamlit** for the frontend, and a **MySQL** database. It includes a custom LLM-powered AI customer assistant chatbot that dynamically translates natural language customer queries into safe MySQL commands to perform inventory and order lookups.
-
----
-
-## 🚦 Terminal Quick Start Guide
-
-Run the following commands in your terminal to set up, migrate, and start the application.
-
-### 1. Database Setup
-Create a MySQL database named `fakedb` (configured on port `3030` by default). Run these queries in your MySQL shell:
-```sql
-CREATE DATABASE IF NOT EXISTS fakedb;
-USE fakedb;
-
--- Users Table
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) DEFAULT NULL,
-    role VARCHAR(50) DEFAULT 'user'
-);
-
--- Products Table
-CREATE TABLE IF NOT EXISTS products (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    stock INT NOT NULL,
-    image_url VARCHAR(500) DEFAULT NULL,
-    category VARCHAR(100) DEFAULT NULL
-);
-
--- Orders Table
-CREATE TABLE IF NOT EXISTS orders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    delivery_status VARCHAR(50) DEFAULT 'Pending',
-    delivery_person_id INT DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (delivery_person_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
--- Order Items Table
-CREATE TABLE IF NOT EXISTS order_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
-    product_id INT NOT NULL,
-    quantity INT NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-);
-```
-
-### 2. Environment Configuration
-Create a `.env` file in the project root folder with the following configuration:
-```env
-GROQ_API_KEY="your_groq_api_key"
-XAI_API_KEY="your_xai_api_key"
-
-DB_HOST="localhost"
-DB_USER="root"
-DB_PASSWORD="your_mysql_password"
-DB_NAME="fakedb"
-DB_PORT=3030
-```
-
-### 3. Installation, Migrations, & Seeding
-Open your terminal in the project root directory:
-```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-.\venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations (Add columns for passwords, categories, images, and delivery status)
-python migrate_db.py
-python migrate_delivery.py
-python migrate_users_db.py
-
-# Seed the database with 50 products
-python seed_products.py
-```
-
-### 4. Running the Servers
+ Running the Servers
 Ensure the virtual environment is activated, then launch both servers:
-
+```bash
+  venv\Scripts\activate
+  ```
 * **Terminal 1: Start FastAPI Backend**
   ```bash
   uvicorn backend.main:app --reload --port 8000
@@ -104,7 +13,7 @@ Ensure the virtual environment is activated, then launch both servers:
   streamlit run frontend/app.py
   ```
 
-*Note: For local development, open [frontend/app.py](file:///c:/Users/tojay/OneDrive/code/Desktop/intern/fetchapi/frontend/app.py) and change `API_URL` (line 12) from `https://shopsite-streamlit.onrender.com` to `http://localhost:8000`.*
+
 
 ---
 
